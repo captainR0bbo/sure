@@ -6,7 +6,7 @@ class BudgetCategory < ApplicationRecord
 
   validates :budget_id, uniqueness: { scope: :category_id }
 
-  monetize :budgeted_spending, :available_to_spend, :avg_monthly_expense, :median_monthly_expense, :actual_spending
+  monetize :budgeted_spending, :available_to_spend, :avg_monthly_expense, :median_monthly_expense, :actual_spending, :net_spending
 
   class Group
     attr_reader :budget_category, :budget_subcategories
@@ -53,6 +53,11 @@ class BudgetCategory < ApplicationRecord
     budget.budget_category_actual_spending(self)
   end
 
+  # Calculate net spending (expenses minus credits) for this budget category
+  def net_spending
+    budget.budget_category_net_spending(self)
+  end
+
   def avg_monthly_expense
     budget.category_avg_monthly_expense(category)
   end
@@ -66,22 +71,22 @@ class BudgetCategory < ApplicationRecord
   end
 
   def available_to_spend
-    (budgeted_spending || 0) - actual_spending
+    (budgeted_spending || 0) - net_spending
   end
 
   def percent_of_budget_spent
     return 0 unless budgeted_spending > 0
 
-    (actual_spending / budgeted_spending) * 100
+    (net_spending / budgeted_spending) * 100
   end
 
   def to_donut_segments_json
     unused_segment_id = "unused"
     overage_segment_id = "overage"
 
-    return [ { color: "var(--budget-unallocated-fill)", amount: 1, id: unused_segment_id } ] unless actual_spending > 0
+    return [ { color: "var(--budget-unallocated-fill)", amount: 1, id: unused_segment_id } ] unless net_spending > 0
 
-    segments = [ { color: category.color, amount: actual_spending, id: id } ]
+    segments = [ { color: category.color, amount: net_spending, id: id } ]
 
     if available_to_spend.negative?
       segments.push({ color: "var(--color-destructive)", amount: available_to_spend.abs, id: overage_segment_id })

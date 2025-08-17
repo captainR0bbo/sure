@@ -9,7 +9,7 @@
       <% if @budget_category.budget.initialized? %>
         <p class="text-sm text-secondary">
           <span class="text-primary">
-            <%= format_money(@budget_category.actual_spending_money) %>
+            <%= format_money(@budget_category.net_spending_money) %>
           </span>
           <span>/</span>
           <span><%= format_money(@budget_category.budgeted_spending_money) %></span>
@@ -34,7 +34,7 @@
               <%= @budget_category.budget.start_date.strftime("%b %Y") %> spending
             </dt>
             <dd class="text-primary font-medium">
-              <%= format_money @budget_category.actual_spending_money %>
+              <%= format_money @budget_category.net_spending_money %>
             </dd>
           </div>
 
