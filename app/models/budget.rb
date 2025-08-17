@@ -137,7 +137,7 @@ class Budget < ApplicationRecord
     return [ { color: "var(--budget-unallocated-fill)", amount: 1, id: unused_segment_id } ] unless allocations_valid?
 
     segments = budget_categories.map do |bc|
-      { color: bc.category.color, amount: budget_category_actual_spending(bc), id: bc.id }
+      { color: bc.category.color, amount: budget_category_net_spending(bc), id: bc.id }
     end
 
     if available_to_spend.positive?
@@ -155,11 +155,59 @@ class Budget < ApplicationRecord
   end
 
   def actual_spending
-    expense_totals.total
+    # Calculate net spending (expenses minus credits) for the budget period
+    expense_totals.total - income_totals.total
   end
 
   def budget_category_actual_spending(budget_category)
     expense_totals.category_totals.find { |ct| ct.category.id == budget_category.category.id }&.total || 0
+  end
+
+  # Calculate net spending (expenses minus credits) for a budget category
+  def budget_category_net_spending(budget_category)
+    category_id = budget_category.category.id
+    
+    # Get expenses (positive amounts)
+    expenses = expense_totals.category_totals.find { |ct| ct.category.id == category_id }&.total || 0
+    
+    # Get credits/refunds (negative amounts) from income totals for the same category
+    credits = income_totals.category_totals.find { |ct| ct.category.id == category_id }&.total || 0
+    
+    # Net spending = expenses - credits (credits reduce the amount spent)
+    expenses - credits
+  end
+
+  # Get all category net spending totals for the budget period
+  def category_net_spending_totals
+    @category_net_spending_totals ||= begin
+      # Get all unique category IDs from both expense and income totals
+      all_category_ids = (expense_totals.category_totals.map(&:category_id) + 
+                         income_totals.category_totals.map(&:category_id)).uniq
+      
+      all_category_ids.map do |category_id|
+        category = family.categories.find_by(id: category_id)
+        next unless category
+        
+        expenses = expense_totals.category_totals.find { |ct| ct.category.id == category_id }&.total || 0
+        credits = income_totals.category_totals.find { |ct| ct.category.id == category_id }&.total || 0
+        net_spending = expenses - credits
+        
+        # Only include categories with non-zero net spending
+        next if net_spending.zero?
+        
+        # Calculate weight based on net spending relative to total expenses
+        total_expenses = expense_totals.total
+        weight = total_expenses.zero? ? 0 : (net_spending.to_f / total_expenses) * 100
+        
+        # Use the same structure as CategoryTotal
+        OpenStruct.new(
+          category: category,
+          total: net_spending,
+          currency: family.currency,
+          weight: weight
+        )
+      end.compact
+    end
   end
 
   def category_median_monthly_expense(category)
