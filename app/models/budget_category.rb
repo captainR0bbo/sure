@@ -6,7 +6,7 @@ class BudgetCategory < ApplicationRecord
 
   validates :budget_id, uniqueness: { scope: :category_id }
 
-  monetize :budgeted_spending, :available_to_spend, :avg_monthly_expense, :median_monthly_expense, :actual_spending
+  monetize :budgeted_spending, :available_to_spend, :avg_monthly_expense, :median_monthly_expense, :actual_spending, :net_spending
 
   class Group
     attr_reader :budget_category, :budget_subcategories
@@ -53,6 +53,11 @@ class BudgetCategory < ApplicationRecord
     budget.budget_category_actual_spending(self)
   end
 
+  # Calculate net spending (expenses minus credits) for this budget category
+  def net_spending
+    budget.budget_category_net_spending(self)
+  end
+
   def avg_monthly_expense
     budget.category_avg_monthly_expense(category)
   end
@@ -96,7 +101,7 @@ class BudgetCategory < ApplicationRecord
       parent.available_to_spend
     elsif subcategory?
       # Subcategory with individual limit
-      (self[:budgeted_spending] || 0) - actual_spending
+      (self[:budgeted_spending] || 0) - net_spending
     else
       # Parent category
       parent_budget = self[:budgeted_spending] || 0
@@ -111,10 +116,10 @@ class BudgetCategory < ApplicationRecord
       shared_pool = parent_budget - subcategories_individual_budgets
 
       # Get actual spending from income statement (includes all subcategories)
-      total_spending = actual_spending
+      total_spending = net_spending
 
       # Subtract spending from subcategories with individual budgets (they use their ring-fenced money)
-      subcategories_with_limits_spending = subcategories_with_limits.sum(&:actual_spending)
+      subcategories_with_limits_spending = subcategories_with_limits.sum(&:net_spending)
 
       # Spending from shared pool = total spending - ring-fenced spending
       shared_pool_spending = total_spending - subcategories_with_limits_spending
@@ -133,13 +138,15 @@ class BudgetCategory < ApplicationRecord
       parent_budget = parent[:budgeted_spending] || 0
       return 0 if parent_budget == 0 && actual_spending == 0
       return 100 if parent_budget == 0 && actual_spending > 0
-      (actual_spending.to_f / parent_budget) * 100
+      return 0 if net_spending <= 0
+      (net_spending.to_f / parent_budget) * 100
     else
       budget_amount = self[:budgeted_spending] || 0
       return 0 if budget_amount == 0 && actual_spending == 0
       return 0 if budget_amount > 0 && actual_spending == 0
       return 100 if budget_amount == 0 && actual_spending > 0
-      (actual_spending.to_f / budget_amount) * 100 if budget_amount > 0 && actual_spending > 0
+      return 0 if net_spending <= 0
+      (net_spending.to_f / budget_amount) * 100 if budget_amount > 0 && net_spending > 0
     end
   end
 
@@ -175,9 +182,9 @@ class BudgetCategory < ApplicationRecord
     unused_segment_id = "unused"
     overage_segment_id = "overage"
 
-    return [ { color: "var(--budget-unallocated-fill)", amount: 1, id: unused_segment_id } ] unless actual_spending > 0
+    return [ { color: "var(--budget-unallocated-fill)", amount: 1, id: unused_segment_id } ] unless net_spending > 0
 
-    segments = [ { color: category.color, amount: actual_spending, id: id } ]
+    segments = [ { color: category.color, amount: net_spending, id: id } ]
 
     if available_to_spend.negative?
       segments.push({ color: "var(--color-destructive)", amount: available_to_spend.abs, id: overage_segment_id })

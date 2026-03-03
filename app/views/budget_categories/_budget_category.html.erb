@@ -58,7 +58,7 @@
         <div class="whitespace-nowrap w-full sm:w-auto">
           <span class="text-sm text-secondary"><%= t("reports.budget_performance.spent") %>:</span>
           <span class="font-medium text-primary">
-            <%= format_money(budget_category.actual_spending_money) %>
+            <%= format_money(budget_category.net_spending_money) %>
           </span>
         </div>
         <div class="whitespace-nowrap w-full sm:w-auto inline-flex items-center gap-1">
@@ -122,7 +122,7 @@
         </div>
 
         <div class="ml-auto text-right flex-shrink-0">
-          <p class="text-sm font-medium text-primary whitespace-nowrap"><%= format_money(budget_category.actual_spending_money) %></p>
+          <p class="text-sm font-medium text-primary whitespace-nowrap"><%= format_money(budget_category.net_spending_money) %></p>
         </div>
       </div>
     <% end %>

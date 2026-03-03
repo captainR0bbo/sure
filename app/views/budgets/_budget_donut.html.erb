@@ -43,7 +43,7 @@
           </div>
 
           <p class="text-3xl font-medium <%= bc.available_to_spend.negative? ? "text-red-500" : "text-primary" %>">
-            <%= format_money(bc.actual_spending_money) %>
+            <%= format_money(bc.net_spending_money) %>
           </p>
 
           <%= render DS::Link.new(
