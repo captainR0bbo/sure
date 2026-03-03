@@ -94,7 +94,12 @@ class BudgetCategory < ApplicationRecord
   end
 
   def available_to_spend
-    if inherits_parent_budget?
+    if category.synthetic?
+      # Synthetic categories like "Uncategorized" and "Other Investments"
+      # should behave like simple standalone buckets and not participate
+      # in parent/subcategory pool calculations.
+      (self[:budgeted_spending] || 0) - net_spending
+    elsif inherits_parent_budget?
       # Subcategories using parent budget share the parent's available_to_spend
       parent = parent_budget_category
       return 0 unless parent
@@ -216,6 +221,7 @@ class BudgetCategory < ApplicationRecord
 
   def subcategories
     return BudgetCategory.none unless category.parent_id.nil?
+    return BudgetCategory.none if category.synthetic?
 
     budget.budget_categories
       .joins(:category)
