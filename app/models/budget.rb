@@ -201,6 +201,11 @@ class Budget < ApplicationRecord
 
   # Calculate net spending (expenses minus credits) for a budget category
   def budget_category_net_spending(budget_category)
+    # For synthetic categories like "Uncategorized" and "Other Investments",
+    # fall back to the actual spending calculation to avoid mixing net income
+    # behavior with the special uncategorized budget bucket.
+    return budget_category_actual_spending(budget_category) if budget_category.category.synthetic?
+
     category_id = budget_category.category.id
 
     # Get expenses (positive amounts)
